@@ -1,15 +1,13 @@
 <?php
 /**
- * Zend Framework (http://framework.zend.com/)
- *
- * @see       http://github.com/zendframework/zend-diactoros for the canonical source repository
- * @copyright Copyright (c) 2015 Zend Technologies USA Inc. (http://www.zend.com)
+ * @see       https://github.com/zendframework/zend-diactoros for the canonical source repository
+ * @copyright Copyright (c) 2015-2017 Zend Technologies USA Inc. (http://www.zend.com)
  * @license   https://github.com/zendframework/zend-diactoros/blob/master/LICENSE.md New BSD License
  */
 
 namespace ZendTest\Diactoros;
 
-use PHPUnit_Framework_TestCase as TestCase;
+use PHPUnit\Framework\TestCase;
 use Zend\Diactoros\PhpInputStream;
 
 class PhpInputStreamTest extends TestCase
@@ -38,7 +36,7 @@ class PhpInputStreamTest extends TestCase
     public function assertStreamContents($test, $message = null)
     {
         $content = $this->getFileContents();
-        $this->assertEquals($content, $test, $message);
+        $this->assertSame($content, $test, $message);
     }
 
     public function testStreamIsNeverWritable()
@@ -61,7 +59,18 @@ class PhpInputStreamTest extends TestCase
         $remainder = $this->stream->getContents();
 
         $contents = $this->getFileContents();
-        $this->assertEquals(substr($contents, 128), $remainder);
+        $this->assertSame(substr($contents, 128), $remainder);
+    }
+
+    public function testGetContentsReturnCacheWhenReachedEof()
+    {
+        $this->stream->getContents();
+        $this->assertStreamContents($this->stream->getContents());
+
+        $stream = new PhpInputStream('data://,0');
+        $stream->read(1);
+        $stream->read(1);
+        $this->assertSame('0', $stream->getContents(), 'Don\'t evaluate 0 as empty');
     }
 
     public function testCastingToStringReturnsFullContentsRegardlesOfPriorReads()

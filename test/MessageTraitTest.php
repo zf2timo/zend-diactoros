@@ -1,17 +1,16 @@
 <?php
 /**
- * Zend Framework (http://framework.zend.com/)
- *
- * @see       http://github.com/zendframework/zend-diactoros for the canonical source repository
- * @copyright Copyright (c) 2015 Zend Technologies USA Inc. (http://www.zend.com)
+ * @see       https://github.com/zendframework/zend-diactoros for the canonical source repository
+ * @copyright Copyright (c) 2015-2017 Zend Technologies USA Inc. (http://www.zend.com)
  * @license   https://github.com/zendframework/zend-diactoros/blob/master/LICENSE.md New BSD License
  */
 
 namespace ZendTest\Diactoros;
 
 use InvalidArgumentException;
-use PHPUnit_Framework_TestCase as TestCase;
+use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\MessageInterface;
+use Psr\Http\Message\StreamInterface;
 use ReflectionMethod;
 use Zend\Diactoros\Request;
 
@@ -24,31 +23,61 @@ class MessageTraitTest extends TestCase
 
     public function setUp()
     {
-        $this->message = new Request(null, null, $this->getMock('Psr\Http\Message\StreamInterface'));
+        $this->message = new Request(null, null, $this->createMock(StreamInterface::class));
     }
 
     public function testProtocolHasAcceptableDefault()
     {
-        $this->assertEquals('1.1', $this->message->getProtocolVersion());
+        $this->assertSame('1.1', $this->message->getProtocolVersion());
     }
 
     public function testProtocolMutatorReturnsCloneWithChanges()
     {
         $message = $this->message->withProtocolVersion('1.0');
         $this->assertNotSame($this->message, $message);
-        $this->assertEquals('1.0', $message->getProtocolVersion());
+        $this->assertSame('1.0', $message->getProtocolVersion());
+    }
+
+
+    public function invalidProtocolVersionProvider()
+    {
+        return [
+            'null'                 => [ null ],
+            'true'                 => [ true ],
+            'false'                => [ false ],
+            'int'                  => [ 1 ],
+            'float'                => [ 1.1 ],
+            'array'                => [ ['1.1'] ],
+            'stdClass'             => [ (object) [ 'version' => '1.0'] ],
+            '1-without-minor'      => [ '1' ],
+            '1-with-invalid-minor' => [ '1.2' ],
+            '1-with-hotfix'        => [ '1.2.3' ],
+            '2-with-minor'         => [ '2.0' ],
+        ];
+    }
+
+    /**
+     * @dataProvider invalidProtocolVersionProvider
+     */
+    public function testWithProtocolVersionRaisesExceptionForInvalidVersion($version)
+    {
+        $request = new Request();
+
+        $this->expectException(InvalidArgumentException::class);
+
+        $request->withProtocolVersion($version);
     }
 
     public function testUsesStreamProvidedInConstructorAsBody()
     {
-        $stream  = $this->getMock('Psr\Http\Message\StreamInterface');
+        $stream  = $this->createMock(StreamInterface::class);
         $message = new Request(null, null, $stream);
         $this->assertSame($stream, $message->getBody());
     }
 
     public function testBodyMutatorReturnsCloneWithChanges()
     {
-        $stream  = $this->getMock('Psr\Http\Message\StreamInterface');
+        $stream  = $this->createMock(StreamInterface::class);
         $message = $this->message->withBody($stream);
         $this->assertNotSame($this->message, $message);
         $this->assertSame($stream, $message->getBody());
@@ -58,21 +87,21 @@ class MessageTraitTest extends TestCase
     {
         $message = $this->message->withHeader('X-Foo', ['Foo', 'Bar']);
         $this->assertNotSame($this->message, $message);
-        $this->assertEquals(['Foo', 'Bar'], $message->getHeader('X-Foo'));
+        $this->assertSame(['Foo', 'Bar'], $message->getHeader('X-Foo'));
     }
 
     public function testGetHeaderLineReturnsHeaderValueAsCommaConcatenatedString()
     {
         $message = $this->message->withHeader('X-Foo', ['Foo', 'Bar']);
         $this->assertNotSame($this->message, $message);
-        $this->assertEquals('Foo,Bar', $message->getHeaderLine('X-Foo'));
+        $this->assertSame('Foo,Bar', $message->getHeaderLine('X-Foo'));
     }
 
     public function testGetHeadersKeepsHeaderCaseSensitivity()
     {
         $message = $this->message->withHeader('X-Foo', ['Foo', 'Bar']);
         $this->assertNotSame($this->message, $message);
-        $this->assertEquals([ 'X-Foo' => [ 'Foo', 'Bar' ] ], $message->getHeaders());
+        $this->assertSame([ 'X-Foo' => [ 'Foo', 'Bar' ] ], $message->getHeaders());
     }
 
     public function testGetHeadersReturnsCaseWithWhichHeaderFirstRegistered()
@@ -81,7 +110,7 @@ class MessageTraitTest extends TestCase
             ->withHeader('X-Foo', 'Foo')
             ->withAddedHeader('x-foo', 'Bar');
         $this->assertNotSame($this->message, $message);
-        $this->assertEquals([ 'X-Foo' => [ 'Foo', 'Bar' ] ], $message->getHeaders());
+        $this->assertSame([ 'X-Foo' => [ 'Foo', 'Bar' ] ], $message->getHeaders());
     }
 
     public function testHasHeaderReturnsFalseIfHeaderIsNotPresent()
@@ -102,8 +131,24 @@ class MessageTraitTest extends TestCase
         $this->assertNotSame($this->message, $message);
         $message2 = $message->withAddedHeader('X-Foo', 'Bar');
         $this->assertNotSame($message, $message2);
-        $this->assertEquals('Foo,Bar', $message2->getHeaderLine('X-Foo'));
+        $this->assertSame('Foo,Bar', $message2->getHeaderLine('X-Foo'));
     }
+
+    public function testHeaderExistsIfWithNoValues()
+    {
+        $message = $this->message->withHeader('X-Foo', []);
+
+        $this->assertTrue($message->hasHeader('X-Foo'));
+    }
+
+    public function testHeaderWithNoValues()
+    {
+        $message = $this->message->withHeader('X-Foo', []);
+
+        $this->assertSame([], $message->getHeader('X-Foo'));
+        $this->assertSame('', $message->getHeaderLine('X-Foo'));
+    }
+
 
     public function testCanRemoveHeaders()
     {
@@ -131,7 +176,7 @@ class MessageTraitTest extends TestCase
         $this->assertFalse($message2->hasHeader('X-Foo'));
 
         $headers = $message2->getHeaders();
-        $this->assertEquals(0, count($headers));
+        $this->assertSame(0, count($headers));
     }
 
     public function invalidGeneralHeaderValues()
@@ -140,8 +185,6 @@ class MessageTraitTest extends TestCase
             'null'   => [null],
             'true'   => [true],
             'false'  => [false],
-            'int'    => [1],
-            'float'  => [1.1],
             'array'  => [[ 'foo' => [ 'bar' ] ]],
             'object' => [(object) [ 'foo' => 'bar' ]],
         ];
@@ -152,8 +195,10 @@ class MessageTraitTest extends TestCase
      */
     public function testWithHeaderRaisesExceptionForInvalidNestedHeaderValue($value)
     {
-        $this->setExpectedException('InvalidArgumentException', 'Invalid header value');
-        $message = $this->message->withHeader('X-Foo', [ $value ]);
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Invalid header value');
+
+        $this->message->withHeader('X-Foo', [ $value ]);
     }
 
     public function invalidHeaderValues()
@@ -162,8 +207,6 @@ class MessageTraitTest extends TestCase
             'null'   => [null],
             'true'   => [true],
             'false'  => [false],
-            'int'    => [1],
-            'float'  => [1.1],
             'object' => [(object) [ 'foo' => 'bar' ]],
         ];
     }
@@ -173,16 +216,18 @@ class MessageTraitTest extends TestCase
      */
     public function testWithHeaderRaisesExceptionForInvalidValueType($value)
     {
-        $this->setExpectedException('InvalidArgumentException', 'Invalid header value');
-        $message = $this->message->withHeader('X-Foo', $value);
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Invalid header value');
+
+        $this->message->withHeader('X-Foo', $value);
     }
 
     public function testWithHeaderReplacesDifferentCapitalization()
     {
         $this->message = $this->message->withHeader('X-Foo', ['foo']);
         $new = $this->message->withHeader('X-foo', ['bar']);
-        $this->assertEquals(['bar'], $new->getHeader('x-foo'));
-        $this->assertEquals(['X-foo' => ['bar']], $new->getHeaders());
+        $this->assertSame(['bar'], $new->getHeader('x-foo'));
+        $this->assertSame(['X-foo' => ['bar']], $new->getHeaders());
     }
 
     /**
@@ -190,8 +235,10 @@ class MessageTraitTest extends TestCase
      */
     public function testWithAddedHeaderRaisesExceptionForNonStringNonArrayValue($value)
     {
-        $this->setExpectedException('InvalidArgumentException', 'must be a string');
-        $message = $this->message->withAddedHeader('X-Foo', $value);
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('must be a string');
+
+        $this->message->withAddedHeader('X-Foo', $value);
     }
 
     public function testWithoutHeaderDoesNothingIfHeaderDoesNotExist()
@@ -243,7 +290,8 @@ class MessageTraitTest extends TestCase
      */
     public function testDoesNotAllowCRLFInjectionWhenCallingWithHeader($name, $value)
     {
-        $this->setExpectedException('InvalidArgumentException');
+        $this->expectException(InvalidArgumentException::class);
+
         $this->message->withHeader($name, $value);
     }
 
@@ -253,23 +301,24 @@ class MessageTraitTest extends TestCase
      */
     public function testDoesNotAllowCRLFInjectionWhenCallingWithAddedHeader($name, $value)
     {
-        $this->setExpectedException('InvalidArgumentException');
+        $this->expectException(InvalidArgumentException::class);
+
         $this->message->withAddedHeader($name, $value);
     }
 
     public function testWithHeaderAllowsHeaderContinuations()
     {
         $message = $this->message->withHeader('X-Foo-Bar', "value,\r\n second value");
-        $this->assertEquals("value,\r\n second value", $message->getHeaderLine('X-Foo-Bar'));
+        $this->assertSame("value,\r\n second value", $message->getHeaderLine('X-Foo-Bar'));
     }
 
     public function testWithAddedHeaderAllowsHeaderContinuations()
     {
         $message = $this->message->withAddedHeader('X-Foo-Bar', "value,\r\n second value");
-        $this->assertEquals("value,\r\n second value", $message->getHeaderLine('X-Foo-Bar'));
+        $this->assertSame("value,\r\n second value", $message->getHeaderLine('X-Foo-Bar'));
     }
 
-    public function testNumericHeaderValues()
+    public function numericHeaderValuesProvider()
     {
         return [
             'integer' => [ 123 ],
@@ -278,28 +327,19 @@ class MessageTraitTest extends TestCase
     }
 
     /**
-     * @dataProvider testNumericHeaderValues
+     * @dataProvider numericHeaderValuesProvider
      * @group 99
      */
-    public function testFilterHeadersShouldAllowIntegersAndFloats($value)
+    public function testWithHeaderShouldAllowIntegersAndFloats($value)
     {
-        $filter = new ReflectionMethod($this->message, 'filterHeaders');
-        $filter->setAccessible(true);
-        $headers = [
-            'X-Test-Array'  => [ $value ],
-            'X-Test-Scalar' => $value,
-        ];
-        $test = $filter->invoke($this->message, $headers);
-        $this->assertEquals([
-            [
-                'x-test-array'  => 'X-Test-Array',
-                'x-test-scalar' => 'X-Test-Scalar',
-            ],
-            [
-                'X-Test-Array'  => [ $value ],
-                'X-Test-Scalar' => [ $value ],
-            ]
-        ], $test);
+        $message = $this->message
+            ->withHeader('X-Test-Array', [ $value ])
+            ->withHeader('X-Test-Scalar', $value);
+
+        $this->assertSame([
+            'X-Test-Array'  => [ (string) $value ],
+            'X-Test-Scalar' => [ (string) $value ],
+        ], $message->getHeaders());
     }
 
     public function invalidHeaderValueTypes()
@@ -323,29 +363,23 @@ class MessageTraitTest extends TestCase
      * @dataProvider invalidArrayHeaderValues
      * @group 99
      */
-    public function testFilterHeadersShouldRaiseExceptionForInvalidHeaderValuesInArrays($value)
+    public function testWithHeaderShouldRaiseExceptionForInvalidHeaderValuesInArrays($value)
     {
-        $filter = new ReflectionMethod($this->message, 'filterHeaders');
-        $filter->setAccessible(true);
-        $headers = [
-            'X-Test-Array'  => [ $value ],
-        ];
-        $this->setExpectedException('InvalidArgumentException', 'header value type');
-        $filter->invoke($this->message, $headers);
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('header value type');
+
+        $this->message->withHeader('X-Test-Array', [ $value ]);
     }
 
     /**
      * @dataProvider invalidHeaderValueTypes
      * @group 99
      */
-    public function testFilterHeadersShouldRaiseExceptionForInvalidHeaderScalarValues($value)
+    public function testWithHeaderShouldRaiseExceptionForInvalidHeaderScalarValues($value)
     {
-        $filter = new ReflectionMethod($this->message, 'filterHeaders');
-        $filter->setAccessible(true);
-        $headers = [
-            'X-Test-Scalar' => $value,
-        ];
-        $this->setExpectedException('InvalidArgumentException', 'header value type');
-        $filter->invoke($this->message, $headers);
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('header value type');
+
+        $this->message->withHeader('X-Test-Scalar', $value);
     }
 }

@@ -1,18 +1,21 @@
 <?php
 /**
- * Zend Framework (http://framework.zend.com/)
- *
- * @see       http://github.com/zendframework/zend-diactoros for the canonical source repository
- * @copyright Copyright (c) 2015 Zend Technologies USA Inc. (http://www.zend.com)
+ * @see       https://github.com/zendframework/zend-diactoros for the canonical source repository
+ * @copyright Copyright (c) 2015-2017 Zend Technologies USA Inc. (http://www.zend.com)
  * @license   https://github.com/zendframework/zend-diactoros/blob/master/LICENSE.md New BSD License
  */
 
 namespace ZendTest\Diactoros;
 
-use PHPUnit_Framework_TestCase as TestCase;
+use OutOfBoundsException;
+use PHPUnit_Framework_MockObject_MockObject;
+use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use Zend\Diactoros\Response;
+use Zend\Diactoros\Response\EmitterInterface;
 use Zend\Diactoros\Server;
+use Zend\Diactoros\ServerRequest;
 use Zend\Diactoros\Stream;
 use ZendTest\Diactoros\TestAsset\HeaderStack;
 
@@ -24,12 +27,12 @@ class ServerTest extends TestCase
     protected $callback;
 
     /**
-     * @var ServerRequestInterface|\PHPUnit_Framework_MockObject_MockObject
+     * @var ServerRequestInterface|PHPUnit_Framework_MockObject_MockObject
      */
     protected $request;
 
     /**
-     * @var ResponseInterface|\PHPUnit_Framework_MockObject_MockObject
+     * @var ResponseInterface|PHPUnit_Framework_MockObject_MockObject
      */
     protected $response;
 
@@ -40,8 +43,8 @@ class ServerTest extends TestCase
         $this->callback   = function ($req, $res, $done) {
             //  Intentionally empty
         };
-        $this->request = $this->getMock('Psr\Http\Message\ServerRequestInterface');
-        $this->response = $this->getMock('Psr\Http\Message\ResponseInterface');
+        $this->request = $this->createMock(ServerRequestInterface::class);
+        $this->response = $this->createMock(ResponseInterface::class);
     }
 
     public function tearDown()
@@ -56,7 +59,8 @@ class ServerTest extends TestCase
             $this->request,
             $this->response
         );
-        $this->assertInstanceOf('Zend\Diactoros\Server', $server);
+
+        $this->assertInstanceOf(Server::class, $server);
         $this->assertSame($this->callback, $server->callback);
         $this->assertSame($this->request, $server->request);
         $this->assertSame($this->response, $server->response);
@@ -68,10 +72,11 @@ class ServerTest extends TestCase
             $this->callback,
             $this->request
         );
-        $this->assertInstanceOf('Zend\Diactoros\Server', $server);
+
+        $this->assertInstanceOf(Server::class, $server);
         $this->assertSame($this->callback, $server->callback);
         $this->assertSame($this->request, $server->request);
-        $this->assertInstanceOf('Zend\Diactoros\Response', $server->response);
+        $this->assertInstanceOf(Response::class, $server->response);
     }
 
     public function testCannotAccessArbitraryProperties()
@@ -82,8 +87,26 @@ class ServerTest extends TestCase
             $this->response
         );
         $prop = uniqid();
-        $this->setExpectedException('OutOfBoundsException');
+
+        $this->expectException(OutOfBoundsException::class);
+
         $server->$prop;
+    }
+
+    public function testEmitterSetter()
+    {
+        $server = new Server(
+            $this->callback,
+            $this->request,
+            $this->response
+        );
+        $emmiter = $this->createMock(EmitterInterface::class);
+        $emmiter->expects($this->once())->method('emit');
+
+        $server->setEmitter($emmiter);
+
+        $this->expectOutputString('');
+        $server->listen();
     }
 
     public function testCreateServerWillCreateDefaultInstancesForRequestAndResponse()
@@ -96,16 +119,16 @@ class ServerTest extends TestCase
             'QUERY_STRING' => 'bar=baz',
         ];
         $server = Server::createServer($this->callback, $server, [], [], [], []);
-        $this->assertInstanceOf('Zend\Diactoros\Server', $server);
+        $this->assertInstanceOf(Server::class, $server);
         $this->assertSame($this->callback, $server->callback);
 
-        $this->assertInstanceOf('Zend\Diactoros\ServerRequest', $server->request);
+        $this->assertInstanceOf(ServerRequest::class, $server->request);
         $request = $server->request;
-        $this->assertEquals('POST', $request->getMethod());
-        $this->assertEquals('/foo/bar', $request->getUri()->getPath());
+        $this->assertSame('POST', $request->getMethod());
+        $this->assertSame('/foo/bar', $request->getUri()->getPath());
         $this->assertTrue($request->hasHeader('Accept'));
 
-        $this->assertInstanceOf('Zend\Diactoros\Response', $server->response);
+        $this->assertInstanceOf(Response::class, $server->response);
     }
 
     public function testListenInvokesCallbackAndSendsResponse()
@@ -127,10 +150,9 @@ class ServerTest extends TestCase
 
         $this->expectOutputString('FOOBAR');
         $server->listen();
-        ob_end_flush();
 
-        $this->assertContains('HTTP/1.1 200 OK', HeaderStack::stack());
-        $this->assertContains('Content-Type: text/plain', HeaderStack::stack());
+        $this->assertTrue(HeaderStack::has('HTTP/1.1 200 OK'));
+        $this->assertTrue(HeaderStack::has('Content-Type: text/plain'));
     }
 
     public function testListenEmitsStatusHeaderWithoutReasonPhraseIfNoReasonPhrase()
@@ -153,10 +175,9 @@ class ServerTest extends TestCase
 
         $this->expectOutputString('FOOBAR');
         $server->listen();
-        ob_end_flush();
 
-        $this->assertContains('HTTP/1.1 299', HeaderStack::stack());
-        $this->assertContains('Content-Type: text/plain', HeaderStack::stack());
+        $this->assertTrue(HeaderStack::has('HTTP/1.1 299'));
+        $this->assertTrue(HeaderStack::has('Content-Type: text/plain'));
     }
 
     public function testEnsurePercentCharactersDoNotResultInOutputError()
@@ -178,10 +199,9 @@ class ServerTest extends TestCase
 
         $this->expectOutputString('100%');
         $server->listen();
-        ob_end_flush();
 
-        $this->assertContains('HTTP/1.1 200 OK', HeaderStack::stack());
-        $this->assertContains('Content-Type: text/plain', HeaderStack::stack());
+        $this->assertTrue(HeaderStack::has('HTTP/1.1 200 OK'));
+        $this->assertTrue(HeaderStack::has('Content-Type: text/plain'));
     }
 
     public function testEmitsHeadersWithMultipleValuesMultipleTimes()
@@ -207,21 +227,17 @@ class ServerTest extends TestCase
         $server = Server::createServer($callback, $server, [], [], [], []);
 
         $server->listen();
-        ob_end_flush();
 
-        $this->assertContains('HTTP/1.1 200 OK', HeaderStack::stack());
-        $this->assertContains('Content-Type: text/plain', HeaderStack::stack());
-        $this->assertContains(
-            'Set-Cookie: foo=bar; expires=Wed, 1 Oct 2014 10:30; path=/foo; domain=example.com',
-            HeaderStack::stack()
+        $this->assertTrue(HeaderStack::has('HTTP/1.1 200 OK'));
+        $this->assertTrue(HeaderStack::has('Content-Type: text/plain'));
+        $this->assertTrue(
+            HeaderStack::has('Set-Cookie: foo=bar; expires=Wed, 1 Oct 2014 10:30; path=/foo; domain=example.com')
         );
-        $this->assertContains(
-            'Set-Cookie: bar=baz; expires=Wed, 8 Oct 2014 10:30; path=/foo/bar; domain=example.com',
-            HeaderStack::stack()
+        $this->assertTrue(
+            HeaderStack::has('Set-Cookie: bar=baz; expires=Wed, 8 Oct 2014 10:30; path=/foo/bar; domain=example.com')
         );
 
-        $stack  = HeaderStack::stack();
-        return $stack;
+        return HeaderStack::stack();
     }
 
     /**
@@ -230,17 +246,23 @@ class ServerTest extends TestCase
      */
     public function testHeaderOrderIsHonoredWhenEmitted($stack)
     {
-        array_pop($stack); // ignore "Content-Length" automatically set by the response emitter
+        $header = array_pop($stack);
+        $this->assertContains('Content-Type: text/plain', $header);
+
         $header = array_pop($stack);
         $this->assertContains(
             'Set-Cookie: bar=baz; expires=Wed, 8 Oct 2014 10:30; path=/foo/bar; domain=example.com',
             $header
         );
+
         $header = array_pop($stack);
         $this->assertContains(
             'Set-Cookie: foo=bar; expires=Wed, 1 Oct 2014 10:30; path=/foo; domain=example.com',
             $header
         );
+
+        $header = array_pop($stack);
+        $this->assertContains('HTTP/1.1 200 OK', $header);
     }
 
     public function testListenPassesCallableArgumentToCallback()
@@ -285,7 +307,6 @@ class ServerTest extends TestCase
             $this->response
         );
         $server->listen($final);
-        ob_end_flush();
         $this->assertTrue($invoked);
     }
 }

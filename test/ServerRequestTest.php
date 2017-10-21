@@ -1,15 +1,14 @@
 <?php
 /**
- * Zend Framework (http://framework.zend.com/)
- *
- * @see       http://github.com/zendframework/zend-diactoros for the canonical source repository
- * @copyright Copyright (c) 2015 Zend Technologies USA Inc. (http://www.zend.com)
+ * @see       https://github.com/zendframework/zend-diactoros for the canonical source repository
+ * @copyright Copyright (c) 2015-2017 Zend Technologies USA Inc. (http://www.zend.com)
  * @license   https://github.com/zendframework/zend-diactoros/blob/master/LICENSE.md New BSD License
  */
 
 namespace ZendTest\Diactoros;
 
-use PHPUnit_Framework_TestCase as TestCase;
+use InvalidArgumentException;
+use PHPUnit\Framework\TestCase;
 use ReflectionProperty;
 use Zend\Diactoros\ServerRequest;
 use Zend\Diactoros\UploadedFile;
@@ -42,7 +41,7 @@ class ServerRequestTest extends TestCase
         $value = ['foo' => 'bar'];
         $request = $this->request->withQueryParams($value);
         $this->assertNotSame($this->request, $request);
-        $this->assertEquals($value, $request->getQueryParams());
+        $this->assertSame($value, $request->getQueryParams());
     }
 
     public function testCookiesAreEmptyByDefault()
@@ -55,7 +54,7 @@ class ServerRequestTest extends TestCase
         $value = ['foo' => 'bar'];
         $request = $this->request->withCookieParams($value);
         $this->assertNotSame($this->request, $request);
-        $this->assertEquals($value, $request->getCookieParams());
+        $this->assertSame($value, $request->getCookieParams());
     }
 
     public function testUploadedFilesAreEmptyByDefault()
@@ -73,7 +72,7 @@ class ServerRequestTest extends TestCase
         $value = ['foo' => 'bar'];
         $request = $this->request->withParsedBody($value);
         $this->assertNotSame($this->request, $request);
-        $this->assertEquals($value, $request->getParsedBody());
+        $this->assertSame($value, $request->getParsedBody());
     }
 
     public function testAttributesAreEmptyByDefault()
@@ -92,7 +91,7 @@ class ServerRequestTest extends TestCase
     {
         $request = $this->request->withAttribute('foo', 'bar');
         $this->assertNotSame($this->request, $request);
-        $this->assertEquals('bar', $request->getAttribute('foo'));
+        $this->assertSame('bar', $request->getAttribute('foo'));
         return $request;
     }
 
@@ -172,7 +171,7 @@ class ServerRequestTest extends TestCase
         $r = new ReflectionProperty($body, 'stream');
         $r->setAccessible(true);
         $stream = $r->getValue($body);
-        $this->assertEquals('php://memory', $stream);
+        $this->assertSame('php://memory', $stream);
     }
 
     /**
@@ -202,5 +201,45 @@ class ServerRequestTest extends TestCase
     {
         $request = new ServerRequest();
         $this->assertNull($request->getParsedBody());
+    }
+
+    public function testAllowsRemovingAttributeWithNullValue()
+    {
+        $request = new ServerRequest();
+        $request = $request->withAttribute('boo', null);
+        $request = $request->withoutAttribute('boo');
+        $this->assertSame([], $request->getAttributes());
+    }
+
+    public function testAllowsRemovingNonExistentAttribute()
+    {
+        $request = new ServerRequest();
+        $request = $request->withoutAttribute('boo');
+        $this->assertSame([], $request->getAttributes());
+    }
+
+    public function testTryToAddInvalidUploadedFiles()
+    {
+        $request = new ServerRequest();
+
+        $this->expectException(InvalidArgumentException::class);
+
+        $request->withUploadedFiles([null]);
+    }
+
+    public function testNestedUploadedFiles()
+    {
+        $request = new ServerRequest();
+
+        $uploadedFiles = [
+            [
+                new UploadedFile('php://temp', 0, 0),
+                new UploadedFile('php://temp', 0, 0),
+            ]
+        ];
+
+        $request = $request->withUploadedFiles($uploadedFiles);
+
+        $this->assertSame($uploadedFiles, $request->getUploadedFiles());
     }
 }

@@ -1,16 +1,14 @@
 <?php
 /**
- * Zend Framework (http://framework.zend.com/)
- *
- * @see       http://github.com/zendframework/zend-diactoros for the canonical source repository
- * @copyright Copyright (c) 2015 Oscar Otero (http://oscarotero.com) / Zend Technologies USA Inc. (http://www.zend.com)
+ * @see       https://github.com/zendframework/zend-diactoros for the canonical source repository
+ * @copyright Copyright (c) 2015-2017 Zend Technologies USA Inc. (http://www.zend.com)
  * @license   https://github.com/zendframework/zend-diactoros/blob/master/LICENSE.md New BSD License
  */
 
 namespace ZendTest\Diactoros;
 
-use PHPUnit_Framework_TestCase as TestCase;
-use Zend\Diactoros\RelativeStream;
+use PHPUnit\Framework\TestCase;
+use RuntimeException;
 use Zend\Diactoros\CallbackStream;
 
 /**
@@ -18,6 +16,26 @@ use Zend\Diactoros\CallbackStream;
  */
 class CallbackStreamTest extends TestCase
 {
+    /**
+     * Sample callback to use with testing.
+     *
+     * @return string
+     */
+    public function sampleCallback()
+    {
+        return __METHOD__;
+    }
+
+    /**
+     * Sample static callback to use with testing.
+     *
+     * @return string
+     */
+    public static function sampleStaticCallback()
+    {
+        return __METHOD__;
+    }
+
     public function testToString()
     {
         $stream = new CallbackStream(function () {
@@ -25,7 +43,7 @@ class CallbackStreamTest extends TestCase
         });
 
         $ret = $stream->__toString();
-        $this->assertEquals('foobarbaz', $ret);
+        $this->assertSame('foobarbaz', $ret);
     }
 
     public function testClose()
@@ -69,13 +87,13 @@ class CallbackStreamTest extends TestCase
         $this->assertNull($ret);
     }
 
-    /**
-     * @expectedException RuntimeException
-     */
     public function testTell()
     {
         $stream = new CallbackStream(function () {
         });
+
+        $this->expectException(RuntimeException::class);
+
         $stream->tell();
     }
 
@@ -103,43 +121,43 @@ class CallbackStreamTest extends TestCase
         $this->assertFalse($ret);
     }
 
-    /**
-     * @expectedException RuntimeException
-     */
     public function testSeek()
     {
         $stream = new CallbackStream(function () {
         });
+
+        $this->expectException(RuntimeException::class);
+
         $stream->seek(0);
     }
 
-    /**
-     * @expectedException RuntimeException
-     */
     public function testRewind()
     {
         $stream = new CallbackStream(function () {
         });
+
+        $this->expectException(RuntimeException::class);
+
         $stream->rewind();
     }
 
-    /**
-     * @expectedException RuntimeException
-     */
     public function testWrite()
     {
         $stream = new CallbackStream(function () {
         });
+
+        $this->expectException(RuntimeException::class);
+
         $stream->write('foobarbaz');
     }
 
-    /**
-     * @expectedException RuntimeException
-     */
     public function testRead()
     {
         $stream = new CallbackStream(function () {
         });
+
+        $this->expectException(RuntimeException::class);
+
         $stream->read(3);
     }
 
@@ -150,7 +168,7 @@ class CallbackStreamTest extends TestCase
         });
 
         $ret = $stream->getContents();
-        $this->assertEquals('foobarbaz', $ret);
+        $this->assertSame('foobarbaz', $ret);
     }
 
     public function testGetMetadata()
@@ -159,12 +177,44 @@ class CallbackStreamTest extends TestCase
         });
 
         $ret = $stream->getMetadata('stream_type');
-        $this->assertEquals('callback', $ret);
+        $this->assertSame('callback', $ret);
 
         $ret = $stream->getMetadata('seekable');
         $this->assertFalse($ret);
 
         $ret = $stream->getMetadata('eof');
         $this->assertFalse($ret);
+
+        $all = $stream->getMetadata();
+        $this->assertSame([
+            'eof' => false,
+            'stream_type' => 'callback',
+            'seekable' => false,
+        ], $all);
+
+        $notExists = $stream->getMetadata('boo');
+        $this->assertNull($notExists);
+    }
+
+    public function phpCallbacksForStreams()
+    {
+        $class = __CLASS__;
+
+        // @codingStandardsIgnoreStart
+        return [
+            'instance-method' => [[new self(), 'sampleCallback'],   $class . '::sampleCallback'],
+            'static-method'   => [[$class, 'sampleStaticCallback'], $class . '::sampleStaticCallback'],
+        ];
+        // @codingStandardsIgnoreEnd
+    }
+
+    /**
+     * @dataProvider phpCallbacksForStreams
+     */
+    public function testAllowsArbitraryPhpCallbacks($callback, $expected)
+    {
+        $stream = new CallbackStream($callback);
+        $contents = $stream->getContents();
+        $this->assertSame($expected, $contents);
     }
 }

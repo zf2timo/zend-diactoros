@@ -1,15 +1,15 @@
 <?php
 /**
- * Zend Framework (http://framework.zend.com/)
- *
- * @see       http://github.com/zendframework/zend-diactoros for the canonical source repository
- * @copyright Copyright (c) 2015 Zend Technologies USA Inc. (http://www.zend.com)
+ * @see       https://github.com/zendframework/zend-diactoros for the canonical source repository
+ * @copyright Copyright (c) 2015-2017 Zend Technologies USA Inc. (http://www.zend.com)
  * @license   https://github.com/zendframework/zend-diactoros/blob/master/LICENSE.md New BSD License
  */
 
 namespace ZendTest\Diactoros\Response;
 
-use PHPUnit_Framework_TestCase as TestCase;
+use InvalidArgumentException;
+use PHPUnit\Framework\TestCase;
+use Psr\Http\Message\StreamInterface;
 use Zend\Diactoros\Response\HtmlResponse;
 
 class HtmlResponseTest extends TestCase
@@ -20,7 +20,7 @@ class HtmlResponseTest extends TestCase
 
         $response = new HtmlResponse($body);
         $this->assertSame($body, (string) $response->getBody());
-        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertSame(200, $response->getStatusCode());
     }
 
     public function testConstructorAllowsPassingStatus()
@@ -29,7 +29,7 @@ class HtmlResponseTest extends TestCase
         $status = 404;
 
         $response = new HtmlResponse($body, $status);
-        $this->assertEquals(404, $response->getStatusCode());
+        $this->assertSame(404, $response->getStatusCode());
         $this->assertSame($body, (string) $response->getBody());
     }
 
@@ -42,15 +42,15 @@ class HtmlResponseTest extends TestCase
         ];
 
         $response = new HtmlResponse($body, $status, $headers);
-        $this->assertEquals(['foo-bar'], $response->getHeader('x-custom'));
-        $this->assertEquals('text/html; charset=utf-8', $response->getHeaderLine('content-type'));
-        $this->assertEquals(404, $response->getStatusCode());
+        $this->assertSame(['foo-bar'], $response->getHeader('x-custom'));
+        $this->assertSame('text/html; charset=utf-8', $response->getHeaderLine('content-type'));
+        $this->assertSame(404, $response->getStatusCode());
         $this->assertSame($body, (string) $response->getBody());
     }
 
     public function testAllowsStreamsForResponseBody()
     {
-        $stream = $this->prophesize('Psr\Http\Message\StreamInterface');
+        $stream = $this->prophesize(StreamInterface::class);
         $body   = $stream->reveal();
         $response = new HtmlResponse($body);
         $this->assertSame($body, $response->getBody());
@@ -73,11 +73,12 @@ class HtmlResponseTest extends TestCase
 
     /**
      * @dataProvider invalidHtmlContent
-     * @expectedException InvalidArgumentException
      */
     public function testRaisesExceptionforNonStringNonStreamBodyContent($body)
     {
-        $response = new HtmlResponse($body);
+        $this->expectException(InvalidArgumentException::class);
+
+        new HtmlResponse($body);
     }
 
     public function testConstructorRewindsBodyStream()
@@ -86,6 +87,6 @@ class HtmlResponseTest extends TestCase
         $response = new HtmlResponse($html);
 
         $actual = $response->getBody()->getContents();
-        $this->assertEquals($html, $actual);
+        $this->assertSame($html, $actual);
     }
 }

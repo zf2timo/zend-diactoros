@@ -1,15 +1,13 @@
 <?php
 /**
- * Zend Framework (http://framework.zend.com/)
- *
- * @see       http://github.com/zendframework/zend-diactoros for the canonical source repository
- * @copyright Copyright (c) 2015 Zend Technologies USA Inc. (http://www.zend.com)
+ * @see       https://github.com/zendframework/zend-diactoros for the canonical source repository
+ * @copyright Copyright (c) 2015-2017 Zend Technologies USA Inc. (http://www.zend.com)
  * @license   https://github.com/zendframework/zend-diactoros/blob/master/LICENSE.md New BSD License
  */
 
 namespace ZendTest\Diactoros;
 
-use PHPUnit_Framework_TestCase as TestCase;
+use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
 use ReflectionProperty;
 use UnexpectedValueException;
@@ -78,6 +76,23 @@ class ServerRequestFactoryTest extends TestCase
             'content-length' => 'UNSPECIFIED',
         ];
 
+        $this->assertSame($expected, ServerRequestFactory::marshalHeaders($server));
+    }
+
+    public function testMarshalsVariablesPrefixedByApacheFromServerArray()
+    {
+        // Non-prefixed versions will be preferred
+        $server = [
+            'HTTP_X_FOO_BAR' => 'nonprefixed',
+            'REDIRECT_HTTP_AUTHORIZATION' => 'token',
+            'REDIRECT_HTTP_X_FOO_BAR' => 'prefixed',
+        ];
+
+        $expected = [
+            'authorization' => 'token',
+            'x-foo-bar' => 'nonprefixed',
+        ];
+
         $this->assertEquals($expected, ServerRequestFactory::marshalHeaders($server));
     }
 
@@ -100,7 +115,7 @@ class ServerRequestFactoryTest extends TestCase
             'UNENCODED_URL' => '/foo/bar',
         ];
 
-        $this->assertEquals($server['UNENCODED_URL'], ServerRequestFactory::marshalRequestUri($server));
+        $this->assertSame($server['UNENCODED_URL'], ServerRequestFactory::marshalRequestUri($server));
     }
 
     public function testMarshalRequestUriUsesHTTPXRewriteUrlIfPresent()
@@ -112,7 +127,7 @@ class ServerRequestFactoryTest extends TestCase
             'HTTP_X_REWRITE_URL' => '/bar/baz',
         ];
 
-        $this->assertEquals($server['HTTP_X_REWRITE_URL'], ServerRequestFactory::marshalRequestUri($server));
+        $this->assertSame($server['HTTP_X_REWRITE_URL'], ServerRequestFactory::marshalRequestUri($server));
     }
 
     public function testMarshalRequestUriUsesHTTPXOriginalUrlIfPresent()
@@ -125,7 +140,7 @@ class ServerRequestFactoryTest extends TestCase
             'HTTP_X_ORIGINAL_URL' => '/baz/bat',
         ];
 
-        $this->assertEquals($server['HTTP_X_ORIGINAL_URL'], ServerRequestFactory::marshalRequestUri($server));
+        $this->assertSame($server['HTTP_X_ORIGINAL_URL'], ServerRequestFactory::marshalRequestUri($server));
     }
 
     public function testMarshalRequestUriStripsSchemeHostAndPortInformationWhenPresent()
@@ -134,7 +149,7 @@ class ServerRequestFactoryTest extends TestCase
             'REQUEST_URI' => 'http://example.com:8000/foo/bar',
         ];
 
-        $this->assertEquals('/foo/bar', ServerRequestFactory::marshalRequestUri($server));
+        $this->assertSame('/foo/bar', ServerRequestFactory::marshalRequestUri($server));
     }
 
     public function testMarshalRequestUriUsesOrigPathInfoIfPresent()
@@ -143,14 +158,14 @@ class ServerRequestFactoryTest extends TestCase
             'ORIG_PATH_INFO' => '/foo/bar',
         ];
 
-        $this->assertEquals('/foo/bar', ServerRequestFactory::marshalRequestUri($server));
+        $this->assertSame('/foo/bar', ServerRequestFactory::marshalRequestUri($server));
     }
 
     public function testMarshalRequestUriFallsBackToRoot()
     {
         $server = [];
 
-        $this->assertEquals('/', ServerRequestFactory::marshalRequestUri($server));
+        $this->assertSame('/', ServerRequestFactory::marshalRequestUri($server));
     }
 
     public function testMarshalHostAndPortUsesHostHeaderWhenPresent()
@@ -162,7 +177,7 @@ class ServerRequestFactoryTest extends TestCase
 
         $accumulator = (object) ['host' => '', 'port' => null];
         ServerRequestFactory::marshalHostAndPortFromHeaders($accumulator, [], $request->getHeaders());
-        $this->assertEquals('example.com', $accumulator->host);
+        $this->assertSame('example.com', $accumulator->host);
         $this->assertNull($accumulator->port);
     }
 
@@ -175,8 +190,8 @@ class ServerRequestFactoryTest extends TestCase
 
         $accumulator = (object) ['host' => '', 'port' => null];
         ServerRequestFactory::marshalHostAndPortFromHeaders($accumulator, [], $request->getHeaders());
-        $this->assertEquals('example.com', $accumulator->host);
-        $this->assertEquals(8000, $accumulator->port);
+        $this->assertSame('example.com', $accumulator->host);
+        $this->assertSame(8000, $accumulator->port);
     }
 
     public function testMarshalHostAndPortReturnsEmptyValuesIfNoHostHeaderAndNoServerName()
@@ -186,7 +201,7 @@ class ServerRequestFactoryTest extends TestCase
 
         $accumulator = (object) ['host' => '', 'port' => null];
         ServerRequestFactory::marshalHostAndPortFromHeaders($accumulator, [], $request->getHeaders());
-        $this->assertEquals('', $accumulator->host);
+        $this->assertSame('', $accumulator->host);
         $this->assertNull($accumulator->port);
     }
 
@@ -200,7 +215,7 @@ class ServerRequestFactoryTest extends TestCase
         ];
         $accumulator = (object) ['host' => '', 'port' => null];
         ServerRequestFactory::marshalHostAndPortFromHeaders($accumulator, $server, $request->getHeaders());
-        $this->assertEquals('example.com', $accumulator->host);
+        $this->assertSame('example.com', $accumulator->host);
         $this->assertNull($accumulator->port);
     }
 
@@ -215,8 +230,8 @@ class ServerRequestFactoryTest extends TestCase
         ];
         $accumulator = (object) ['host' => '', 'port' => null];
         ServerRequestFactory::marshalHostAndPortFromHeaders($accumulator, $server, $request->getHeaders());
-        $this->assertEquals('example.com', $accumulator->host);
-        $this->assertEquals(8000, $accumulator->port);
+        $this->assertSame('example.com', $accumulator->host);
+        $this->assertSame(8000, $accumulator->port);
     }
 
     public function testMarshalHostAndPortReturnsServerNameForHostIfServerAddrPresentButHostIsNotIpv6Address()
@@ -230,7 +245,7 @@ class ServerRequestFactoryTest extends TestCase
         ];
         $accumulator = (object) ['host' => '', 'port' => null];
         ServerRequestFactory::marshalHostAndPortFromHeaders($accumulator, $server, $request->getHeaders());
-        $this->assertEquals('example.com', $accumulator->host);
+        $this->assertSame('example.com', $accumulator->host);
     }
 
     public function testMarshalHostAndPortReturnsServerAddrForHostIfPresentAndHostIsIpv6Address()
@@ -245,8 +260,8 @@ class ServerRequestFactoryTest extends TestCase
         ];
         $accumulator = (object) ['host' => '', 'port' => null];
         ServerRequestFactory::marshalHostAndPortFromHeaders($accumulator, $server, $request->getHeaders());
-        $this->assertEquals('[FE80::0202:B3FF:FE1E:8329]', $accumulator->host);
-        $this->assertEquals(8000, $accumulator->port);
+        $this->assertSame('[FE80::0202:B3FF:FE1E:8329]', $accumulator->host);
+        $this->assertSame(8000, $accumulator->port);
     }
 
     public function testMarshalHostAndPortWillDetectPortInIpv6StyleHost()
@@ -260,8 +275,8 @@ class ServerRequestFactoryTest extends TestCase
         ];
         $accumulator = (object) ['host' => '', 'port' => null];
         ServerRequestFactory::marshalHostAndPortFromHeaders($accumulator, $server, $request->getHeaders());
-        $this->assertEquals('[FE80::0202:B3FF:FE1E:8329]', $accumulator->host);
-        $this->assertEquals(80, $accumulator->port);
+        $this->assertSame('[FE80::0202:B3FF:FE1E:8329]', $accumulator->host);
+        $this->assertSame(80, $accumulator->port);
     }
 
     public function testMarshalUriDetectsHttpsSchemeFromServerValue()
@@ -275,8 +290,9 @@ class ServerRequestFactoryTest extends TestCase
         ];
 
         $uri = ServerRequestFactory::marshalUriFromServer($server, $request->getHeaders());
-        $this->assertInstanceOf('Zend\Diactoros\Uri', $uri);
-        $this->assertEquals('https', $uri->getScheme());
+
+        $this->assertInstanceOf(Uri::class, $uri);
+        $this->assertSame('https', $uri->getScheme());
     }
 
     public function testMarshalUriUsesHttpSchemeIfHttpsServerValueEqualsOff()
@@ -290,8 +306,9 @@ class ServerRequestFactoryTest extends TestCase
         ];
 
         $uri = ServerRequestFactory::marshalUriFromServer($server, $request->getHeaders());
-        $this->assertInstanceOf('Zend\Diactoros\Uri', $uri);
-        $this->assertEquals('http', $uri->getScheme());
+
+        $this->assertInstanceOf(Uri::class, $uri);
+        $this->assertSame('http', $uri->getScheme());
     }
 
     public function testMarshalUriDetectsHttpsSchemeFromXForwardedProtoValue()
@@ -304,8 +321,9 @@ class ServerRequestFactoryTest extends TestCase
         $server  = [];
 
         $uri = ServerRequestFactory::marshalUriFromServer($server, $request->getHeaders());
-        $this->assertInstanceOf('Zend\Diactoros\Uri', $uri);
-        $this->assertEquals('https', $uri->getScheme());
+
+        $this->assertInstanceOf(Uri::class, $uri);
+        $this->assertSame('https', $uri->getScheme());
     }
 
     public function testMarshalUriStripsQueryStringFromRequestUri()
@@ -319,8 +337,9 @@ class ServerRequestFactoryTest extends TestCase
         ];
 
         $uri = ServerRequestFactory::marshalUriFromServer($server, $request->getHeaders());
-        $this->assertInstanceOf('Zend\Diactoros\Uri', $uri);
-        $this->assertEquals('/foo/bar', $uri->getPath());
+
+        $this->assertInstanceOf(Uri::class, $uri);
+        $this->assertSame('/foo/bar', $uri->getPath());
     }
 
     public function testMarshalUriInjectsQueryStringFromServer()
@@ -335,8 +354,25 @@ class ServerRequestFactoryTest extends TestCase
         ];
 
         $uri = ServerRequestFactory::marshalUriFromServer($server, $request->getHeaders());
-        $this->assertInstanceOf('Zend\Diactoros\Uri', $uri);
-        $this->assertEquals('bar=baz', $uri->getQuery());
+
+        $this->assertInstanceOf(Uri::class, $uri);
+        $this->assertSame('bar=baz', $uri->getQuery());
+    }
+
+    public function testMarshalUriInjectsFragmentFromServer()
+    {
+        $request = new ServerRequest();
+        $request = $request->withUri(new Uri('http://example.com/'));
+        $request = $request->withHeader('Host', 'example.com');
+
+        $server = [
+            'REQUEST_URI' => '/foo/bar#foo',
+        ];
+
+        $uri = ServerRequestFactory::marshalUriFromServer($server, $request->getHeaders());
+
+        $this->assertInstanceOf(Uri::class, $uri);
+        $this->assertSame('foo', $uri->getFragment());
     }
 
     public function testCanCreateServerRequestViaFromGlobalsMethod()
@@ -369,18 +405,86 @@ class ServerRequestFactoryTest extends TestCase
         ];
 
         $request = ServerRequestFactory::fromGlobals($server, $query, $body, $cookies, $files);
-        $this->assertInstanceOf('Zend\Diactoros\ServerRequest', $request);
-        $this->assertEquals($cookies, $request->getCookieParams());
-        $this->assertEquals($query, $request->getQueryParams());
-        $this->assertEquals($body, $request->getParsedBody());
+        $this->assertInstanceOf(ServerRequest::class, $request);
+        $this->assertSame($cookies, $request->getCookieParams());
+        $this->assertSame($query, $request->getQueryParams());
+        $this->assertSame($body, $request->getParsedBody());
         $this->assertEquals($expectedFiles, $request->getUploadedFiles());
         $this->assertEmpty($request->getAttributes());
-        $this->assertEquals('1.1', $request->getProtocolVersion());
+        $this->assertSame('1.1', $request->getProtocolVersion());
+    }
+
+    public function testFromGlobalsUsesCookieHeaderInsteadOfCookieSuperGlobal()
+    {
+        $_COOKIE = [
+            'foo_bar' => 'bat',
+        ];
+        $_SERVER['HTTP_COOKIE'] = 'foo_bar=baz';
+
+        $request = ServerRequestFactory::fromGlobals();
+        $this->assertSame(['foo_bar' => 'baz'], $request->getCookieParams());
+    }
+
+    /**
+     * @runInSeparateProcess
+     * @preserveGlobalState disabled
+     */
+    public function testFromGlobalsUsesCookieSuperGlobalWhenCookieHeaderIsNotSet()
+    {
+        $_COOKIE = [
+            'foo_bar' => 'bat',
+        ];
+
+        $request = ServerRequestFactory::fromGlobals();
+        $this->assertSame(['foo_bar' => 'bat'], $request->getCookieParams());
+    }
+
+    public function cookieHeaderValues()
+    {
+        return [
+            'ows-without-fold' => [
+                "\tfoo=bar ",
+                ['foo' => 'bar'],
+            ],
+            'url-encoded-value' => [
+                'foo=bar%3B+',
+                ['foo' => 'bar; '],
+            ],
+            'double-quoted-value' => [
+                'foo="bar"',
+                ['foo' => 'bar'],
+            ],
+            'multiple-pairs' => [
+                'foo=bar; baz="bat"; bau=bai',
+                ['foo' => 'bar', 'baz' => 'bat', 'bau' => 'bai'],
+            ],
+            'same-name-pairs' => [
+                'foo=bar; foo="bat"',
+                ['foo' => 'bat'],
+            ],
+            'period-in-name' => [
+                'foo.bar=baz',
+                ['foo.bar' => 'baz'],
+            ],
+        ];
+    }
+
+    /**
+     * @dataProvider cookieHeaderValues
+     * @param string $cookieHeader
+     * @param array $expectedCookies
+     */
+    public function testCookieHeaderVariations($cookieHeader, array $expectedCookies)
+    {
+        $_SERVER['HTTP_COOKIE'] = $cookieHeader;
+
+        $request = ServerRequestFactory::fromGlobals();
+        $this->assertSame($expectedCookies, $request->getCookieParams());
     }
 
     public function testNormalizeServerUsesMixedCaseAuthorizationHeaderFromApacheWhenPresent()
     {
-        $r = new ReflectionProperty('Zend\Diactoros\ServerRequestFactory', 'apacheRequestHeaders');
+        $r = new ReflectionProperty(ServerRequestFactory::class, 'apacheRequestHeaders');
         $r->setAccessible(true);
         $r->setValue(function () {
             return ['Authorization' => 'foobar'];
@@ -389,12 +493,12 @@ class ServerRequestFactoryTest extends TestCase
         $server = ServerRequestFactory::normalizeServer([]);
 
         $this->assertArrayHasKey('HTTP_AUTHORIZATION', $server);
-        $this->assertEquals('foobar', $server['HTTP_AUTHORIZATION']);
+        $this->assertSame('foobar', $server['HTTP_AUTHORIZATION']);
     }
 
     public function testNormalizeServerUsesLowerCaseAuthorizationHeaderFromApacheWhenPresent()
     {
-        $r = new ReflectionProperty('Zend\Diactoros\ServerRequestFactory', 'apacheRequestHeaders');
+        $r = new ReflectionProperty(ServerRequestFactory::class, 'apacheRequestHeaders');
         $r->setAccessible(true);
         $r->setValue(function () {
             return ['authorization' => 'foobar'];
@@ -403,12 +507,12 @@ class ServerRequestFactoryTest extends TestCase
         $server = ServerRequestFactory::normalizeServer([]);
 
         $this->assertArrayHasKey('HTTP_AUTHORIZATION', $server);
-        $this->assertEquals('foobar', $server['HTTP_AUTHORIZATION']);
+        $this->assertSame('foobar', $server['HTTP_AUTHORIZATION']);
     }
 
     public function testNormalizeServerReturnsArrayUnalteredIfApacheHeadersDoNotContainAuthorization()
     {
-        $r = new ReflectionProperty('Zend\Diactoros\ServerRequestFactory', 'apacheRequestHeaders');
+        $r = new ReflectionProperty(ServerRequestFactory::class, 'apacheRequestHeaders');
         $r->setAccessible(true);
         $r->setValue(function () {
             return [];
@@ -417,7 +521,7 @@ class ServerRequestFactoryTest extends TestCase
         $expected = ['FOO_BAR' => 'BAZ'];
         $server = ServerRequestFactory::normalizeServer($expected);
 
-        $this->assertEquals($expected, $server);
+        $this->assertSame($expected, $server);
     }
 
     /**
@@ -439,27 +543,41 @@ class ServerRequestFactoryTest extends TestCase
         $this->assertCount(1, $normalizedFiles['fooFiles']);
     }
 
-    public function testMarshalProtocolVersionReturnsHttpVersion()
-    {
-        $method = new ReflectionMethod('Zend\Diactoros\ServerRequestFactory', 'marshalProtocolVersion');
-        $method->setAccessible(true);
-        $version = $method->invoke(null, ['SERVER_PROTOCOL' => 'HTTP/1.0']);
-        $this->assertEquals('1.0', $version);
-    }
-
     public function testMarshalProtocolVersionRisesExceptionIfVersionIsNotRecognized()
     {
-        $method = new ReflectionMethod('Zend\Diactoros\ServerRequestFactory', 'marshalProtocolVersion');
+        $method = new ReflectionMethod(ServerRequestFactory::class, 'marshalProtocolVersion');
         $method->setAccessible(true);
-        $this->setExpectedException('UnexpectedValueException');
+
+        $this->expectException(UnexpectedValueException::class);
+
         $method->invoke(null, ['SERVER_PROTOCOL' => 'dadsa/1.0']);
     }
 
     public function testMarshalProtocolReturnsDefaultValueIfHeaderIsNotPresent()
     {
-        $method = new ReflectionMethod('Zend\Diactoros\ServerRequestFactory', 'marshalProtocolVersion');
+        $method = new ReflectionMethod(ServerRequestFactory::class, 'marshalProtocolVersion');
         $method->setAccessible(true);
         $version = $method->invoke(null, []);
-        $this->assertEquals('1.1', $version);
+        $this->assertSame('1.1', $version);
+    }
+
+    /**
+     * @dataProvider marshalProtocolVersionProvider
+     */
+    public function testMarshalProtocolVersionReturnsHttpVersions($protocol, $expected)
+    {
+        $method = new ReflectionMethod(ServerRequestFactory::class, 'marshalProtocolVersion');
+        $method->setAccessible(true);
+        $version = $method->invoke(null, ['SERVER_PROTOCOL' => $protocol]);
+        $this->assertSame($expected, $version);
+    }
+
+    public function marshalProtocolVersionProvider()
+    {
+        return [
+            'HTTP/1.0' => ['HTTP/1.0', '1.0'],
+            'HTTP/1.1' => ['HTTP/1.1', '1.1'],
+            'HTTP/2'   => ['HTTP/2', '2'],
+        ];
     }
 }

@@ -14,7 +14,7 @@
  * It pushes headers into the HeaderStack class defined in Functions.php.
  *
  * @see       http://github.com/zendframework/zend-diactoros for the canonical source repository
- * @copyright Copyright (c) 2015 Zend Technologies USA Inc. (http://www.zend.com)
+ * @copyright Copyright (c) 2015-2016 Zend Technologies USA Inc. (http://www.zend.com)
  * @license   https://github.com/zendframework/zend-diactoros/blob/master/LICENSE.md New BSD License
  */
 
@@ -35,9 +35,17 @@ function headers_sent()
 /**
  * Emit a header, without creating actual output artifacts
  *
- * @param string $value
+ * @param string   $string
+ * @param bool     $replace
+ * @param int|null $http_response_code
  */
-function header($value)
+function header($string, $replace = true, $http_response_code = null)
 {
-    HeaderStack::push($value);
+    HeaderStack::push(
+        [
+            'header'      => $string,
+            'replace'     => $replace,
+            'status_code' => $http_response_code,
+        ]
+    );
 }
